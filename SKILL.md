@@ -164,6 +164,18 @@ UITools.exe --json-roundtrip mine.uiproj --out mine_norm.uiproj
 caption 改错、ename 重复、rect 超出父节点，它统统照样通过。
 **排版必须出图看，类型必须看 `--gen` 的警告。**
 
+### 9. 固定文案的字号在 `.xls` 单元格里，改 `Resbuilder.xml` 的 `<Fonts>` 没用
+
+那 22 个 `<fontNN lfHeight="-16"/>` 看着就是字号配置，**改它完全不起作用**，
+而且现象非常像改对了：工具预览会按新值重画，生成出来的 `JL.str` 一个字节没变。
+
+要改就**开 Excel 全选改字号**，存成 `.xls`(BIFF8)，再重跑资源生成。
+运行时字符串（`ui_text_set_*`）是另一条路，字号在 `字库工具/font.xml`，
+两边**不会自动对齐** —— "只有一部分文字变大了"就是这么来的。
+
+改完**先别烧录**：解析 `JL.str` 就知道成没成（格式见 `export.md`），
+`git diff` 是空的就是没生效。**字号改了要回头调列表行高**，否则文字被削顶且不报错。
+
 ---
 
 ## 参考资料（按需读，别一次全看）
@@ -179,6 +191,12 @@ caption 改错、ename 重复、rect 超出父节点，它统统照样通过。
 
 排一个新界面的顺序：`widgets.md` 选控件 → `authoring.md` 搭结构 →
 `layout.md` 落成 json → `app.md` 写回调 → `export.md` 导出。
+
+> ⚠ **要动哪个控件，就把 `widgets.md` 里那个控件那一节读完。**
+> 实战里为了改列表行高，只读了 Text 一节就去改条目 rect，
+> 而 `sizehw`/`space` 就写在同一个文件的列表一节里 ——
+> 结果绕了一大圈去反编译，还改漏了参数。
+> 按关键词 grep 比按行号截一段读更靠谱。
 
 工具自己的完整命令行表在 `tools/LCD_UI工程/UIProject/tool/README.md`。
 

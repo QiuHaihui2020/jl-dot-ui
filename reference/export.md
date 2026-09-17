@@ -101,6 +101,45 @@
 （caption 改错、ename 重复、rect 超出父节点，它都照样通过）。
 所以排版必须靠出图看，类型必须靠 `--gen` 的警告看。
 
+### 改了文案/字号：解析 `JL.str` 验，别上板看
+
+`JL.str` 的格式很简单，解析出来就知道每条文案被渲染成多大的位图：
+
+```
+0x00  "RU40" 魔数 + 头部
+0x20  起，每条 20 字节：
+      u16 lang   语言编号（见 font/language_list.h，1=简体中文）
+      u16 id     字符串编号，对应 project/result_str_index.h 的 #define M42 <id>
+      u16 width  位图宽
+      u16 height 位图高
+      u32 len    数据长度，等于 width*height/8（1bpp，可拿来自检解析对不对）
+      u32 offset 数据偏移
+      u32 crc
+```
+
+```python
+import struct
+d = open('JL.str','rb').read()
+off = 0x20
+while off + 20 <= len(d):
+    lang, sid, w, h, ln, o, crc = struct.unpack_from('<HHHHIII', d, off)
+    if o == 0 or o > len(d) or not (0 < w < 1000) or not (0 < h < 200):
+        break
+    ...
+    off += 20
+```
+
+配合 `result_str_index.h` 的 m 号→id 映射，就能精确对到每个 Text 控件，
+**算出哪些文案会超出 rect** —— 比上板一页页看快得多。
+
+两个实测出来的判据：
+
+- **`git diff` 是空的就是没生效。** `JL.str` 在版本库里，改完重新生成后
+  如果 `git diff` 没有变化，说明这次生成完全没受影响（mtime 变了不算数）。
+  改字号那次就是靠这个发现改错了地方。
+- **`config/` 下的 `m*.png` 不能当依据。** 那批离线渲染的中间产物
+  **不一定跟着资源生成更新**，实测跑完之后它们还是一个月前的时间戳。
+
 ### 时间戳会让"逐字节比对"出假差异
 
 `res_ver.h` / `result_pic_index.h` / `result_str_index.h` 里有

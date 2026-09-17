@@ -183,6 +183,21 @@ NewLayer          x=0  y=0   w=128 h=64      整屏
 `.xls` 里（`Resbuilder.xml` 的 `<excel_path>` 指向它）。一个 Text 控件可以挂多条，
 运行时用 `ui_text_show_index_by_id()` 切换显示第几条。
 
+⚠ **这条路的字号也在 xls 里 —— 是那个单元格自己的字号**，
+不是 `Resbuilder.xml` 的 `<Fonts>`（改它没用）。详见 `widgets.md` 的 Text 一节。
+
+### 列表的行高/间距：`sizehw` / `space`
+
+在**列表节点顶层**，不在 `property[]` 里，翻 `property` 找不到：
+
+```json
+{"-type":"VerticalList", "orientation":"Vertical",
+ "sizehw":16, "space":0, "listwidget":[...], "property":[...]}
+```
+
+设备端只认条目自己的 rect，这两个是编辑器排版用的 —— 但**必须和条目 rect 保持一致**，
+否则下次在编辑器里碰这个列表就会被重排回去。详见 `widgets.md` 的列表一节。
+
 ### `action` —— 不写代码的联动
 
 ```json

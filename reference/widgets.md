@@ -138,6 +138,36 @@ ui_text_set_textw_by_id(id, wide_str, len, endian, FONT_DEFAULT); /* 宽字符 *
 ⚠ STYLE_02 里有一条注释提醒：长歌名直接用 `ui_text_set_textu_by_id`
 **不滚动、会被截断**。要滚动效果得走别的路子。
 
+### ⚠⚠ 上面两种用法的字号是**分开配、分开改**的
+
+这两条路连字号配在哪都不是一个地方，**改错地方之后一切现象都像改对了**：
+
+| | 一、走多国语言表（`str` 列表） | 二、运行时字符串（`ui_text_set_*`） |
+|---|---|---|
+| 变成像素的时机 | 资源生成时**离线渲染**成 1bpp 位图，进 `JL.str` | 设备端字库实时渲染 |
+| **字号配在哪** | **`.xls` 里那个单元格自己的字号** | `字库工具/font.xml` 的 `<FontSize>` |
+| 改完要跑什么 | 重跑资源生成 + 收尾脚本 | `FontTool.exe` 重出 `.PIX` |
+| 跟随语言切换 | 是 | 否 |
+
+⚠ **`Resbuilder.xml` 里那 22 个 `<fontNN lfHeight="-16"/>` 不是 strpic 的字号。**
+它看着就是字号配置，改它**完全不起作用** —— 工具预览会按新值重画，
+但生成出来的 `JL.str` 一个字节都没变。要改固定文案字号只有一条路：
+**开 Excel 全选改字号**，存成 `.xls`(BIFF8，别存成 xlsx)，再重跑资源生成。
+
+（这条是在彩屏工程上实测定位的，两套框架共用同一条 ResBuilder/xls 链路，
+点阵屏同理。彩屏那边的完整证据链见 jl-lcd-ui 的 `platform.md` §6。）
+
+⚠ 同一行不同语言列可以是不同字体，**行高要按最高的那个留**。
+实测少数条目用的是 Times New Roman，同样字号下位图比宋体高 3px。
+
+⚠ **改完先别烧录**，解析 `JL.str` 就能确认成没成（格式见 `export.md`）。
+
+> 读 `.xls` 可以用 `pip install xlrd` +
+> `xlrd.open_workbook(path, formatting_info=True)`，
+> 能读出每个单元格的文案**和字体字号**
+> （`b.font_list[b.xf_list[sheet.cell_xf_index(r,c)].font_index]`）。
+> 查"m42 是哪句话""这条是几号字"不用开 Excel。**写还是只能人工开表格。**
+
 ---
 
 ## ImageList —— 图片
@@ -278,6 +308,44 @@ int p = slider_get_percent(slider);
 - 条目坐标相对列表，自己按行高累加。
 - `scroll_mode`：`SCROLL` 连续滚 / `PAGE` 整页翻。
 - `highlight_index` 默认高亮行。
+
+### ⚠⚠ 行高和间距是**节点顶层**的 `sizehw` / `space`，不在 `property` 里
+
+```json
+{"-class":"NewList", "-type":"VerticalList", "caption":"垂直列表",
+ "orientation":"Vertical",     ← 方向
+ "sizehw": 16,                 ← 行高(水平列表时是列宽)
+ "space": 0,                   ← 相邻条目的间距
+ "listwidget":[ ... ],
+ "property":[ ... ]}           ← 这里面只有 id/element_css/scroll_mode/highlight_index
+```
+
+**翻 `property[]` 是找不到它们的**，控件库里列表控件的 `property` 也确实只有
+`scroll_mode` 和 `highlight_index` —— 于是很容易得出"列表没有行高参数"的
+错误结论，然后只去改条目的 rect。
+
+**设备端只认条目自己的 rect，不读 `sizehw`/`space`。**
+反编译 `ui_new.a` 的 `ui_grid_child_init()` 可见，滚动步进是**反推**出来的：
+
+```c
+y_interval = (max_top - min_top) - (row_num - 1) * 条目高;   // 遍历条目 rect 累出来的
+if (y_interval != 0 && row_num > 1) y_interval /= (row_num - 1);
+```
+
+资源侧也印证：`struct ui_grid_info`（`.sty` 里 grid 的描述）只有
+`page_mode` / `highlight_index` / `action` / `lua` / `info`，
+**没有 sizehw、space、interval 这些字段**，它们进不了资源。
+
+**所以 `sizehw`/`space` 是编辑器的排版参数**：它按这两个值生成条目 rect。
+两边对不上的后果是**下次在编辑器里碰一下这个列表，工具很可能按旧的 `sizehw`
+把条目 rect 重排回去，把你改的行高冲掉**。
+
+改行高要**三处一起改**：列表的 `sizehw`/`space`、每个条目的 rect
+（高 = `sizehw`，y 按 `sizehw + space` 递进）、条目内图标文字在行高内居中。
+
+⚠ **改字号之后一定要回来调行高。** 字号从 12 改到 24，位图高度就翻倍，
+行高不跟着改的话文字会被从顶上削掉一截，而且**不报错**。
+留余量时按最高的那个字体算（见 Text 一节那条西文字体高 3px 的坑）。
 
 **代码怎么调**
 
