@@ -1,6 +1,6 @@
 ---
 name: jl-dot-ui
-description: 杰理(JL)单色点阵屏 UI 框架的界面开发，图层只走 OSD1/MONO。做界面布局（直接编辑 .uiproj 工程脚本）、给控件写应用层回调、生成并导出资源时用。涉及 UITools 工具链、设备端 ui_framework、ename.h 绑定、--gen/--pack 导出链、JL.sty/JL.res/JL.str 产物。不适用于彩屏（OSD16）。
+description: 杰理(JL)单色点阵屏 UI 框架的界面开发，图层只走 OSD1/MONO。做界面布局（直接编辑 .uiproj 工程脚本）、选控件、给控件写应用层回调、生成并导出资源时用；排查界面异常也用——图或文字不显示、一整页只剩一两个控件、图被底图糊住或反过来盖住底图、编辑器预览和实机对不上、改了字号不生效、列表行高不对文字被削顶、ename 重复或改名后控件静默失效、--json-roundtrip 过不了、复刻老设备界面时坐标从哪来。涉及 UITools 命令行（--gen/--shot/--json-roundtrip/--pack）、设备端 ui_framework、ename.h 绑定、JL.sty/JL.res/JL.str 产物、xls 固定文案与字库运行时文字两条独立的字号路径。不适用于彩屏（OSD16，那套看 jl-lcd-ui）。
 ---
 
 # 杰理单色点阵屏 UI 开发
@@ -26,6 +26,30 @@ description: 杰理(JL)单色点阵屏 UI 框架的界面开发，图层只走 O
 
 **AI 做界面不需要开编辑器** —— 直接编辑 `.uiproj`（就是 JSON），
 用命令行验格式、出图看效果。编辑器只在需要人工微调时才开。
+
+---
+
+## ⚠ 动手前的强制阅读
+
+**本 SKILL.md 里的每一条都是一句话摘要，不足以照着动手。**
+下表命中哪一行，就先把对应文件的那一节读完再改——
+这不是"有空再看"，下面每条都是实战里漏读踩出来的。
+
+| 你要做的事 / 你看到的现象 | 动手前必须读 |
+|---|---|
+| 程序化生成或改写 `.uiproj` | `reference/authoring.md`「⚠ json 必须由工具规范化」 |
+| 动某一个控件（挪位置 / 改大小 / 换图 / 改文字） | `reference/widgets.md` **那个控件的整节**，不是只看摘要 |
+| 拿不准该用哪个控件 | `reference/widgets.md`「选型速查」+「两个都能做的时候选哪个」 |
+| 新建页 / 图层 / 布局 / 弹层 | `reference/authoring.md` 第二部分 |
+| 写 json 字段、算类型码、排坐标 | `reference/layout.md` |
+| 写 / 改应用层回调 | `reference/app.md` §3 控件生命周期（头号坑在这） |
+| 图被盖住、和底图糊在一起、预览和实机对不上 | `reference/layout.md` §7 三态背景填充 + §8 谁盖谁 |
+| 改列表行高 / 条目间距 | `reference/widgets.md` **列表那一节**（`sizehw`/`space` 在那，`property` 里找不到） |
+| 改字号 / 改固定文案 | `reference/widgets.md` Text 节 + `reference/export.md` §4 |
+| 导出资源 / 验收 / 和现有产物比对 | `reference/export.md` |
+| 复刻既有设备的界面（坐标从哪来） | 先跑 `tools/locate_frames.py`，并看脚本抬头那四条局限 |
+
+按关键词 grep 比按行号截一段读更靠谱。
 
 ---
 
@@ -55,7 +79,7 @@ tools/check_project.py     语义体检：ename 重复/非法、零尺寸、
 
 ---
 
-## 八条铁律
+## 九条铁律
 
 ### 1. `caption` 决定控件类型，不是 `-type`
 
@@ -178,7 +202,9 @@ caption 改错、ename 重复、rect 超出父节点，它统统照样通过。
 
 ---
 
-## 参考资料（按需读，别一次全看）
+## 参考资料一览
+
+上面那张强制阅读表是入口；这张表是全貌，用来找"我这件事该去哪查"。
 
 | 文件 | 什么时候读 |
 |---|---|
